@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generator Kartu ID & QR Code Massal</title>
+  <!-- Library QRCode.js Ringan -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: #f1f5f9; color: #1e293b; }
+    
+    /* Panel Kontrol Admin (Disembunyikan saat Print) */
+    .admin-panel {
+      max-width: 900px;
+      margin: 24px auto;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .admin-panel h2 { margin: 0 0 8px 0; color: #0f172a; }
+    .admin-panel p { margin: 0 0 16px 0; font-size: 13px; color: #64748b; }
+    
+    .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #475569; }
+    input[type="text"], input[type="color"], textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    input[type="color"] { height: 42px; padding: 4px; cursor: pointer; }
+    textarea { height: 150px; font-family: monospace; line-height: 1.5; resize: vertical; }
+    
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-primary { background: #2563eb; color: #ffffff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-print { background: #16a34a; color: #ffffff; }
+    .btn-print:hover { background: #15803d; }
+    .btn-sample { background: #e2e8f0; color: #334155; }
+
+    /* Area Preview & Cetak Kartu ID */
+    .cards-container {
+      max-width: 900px;
+      margin: 20px auto 50px auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 16px;
+      padding: 0 10px;
+    }
+
+    /* Desain Standar Kartu ID Portrait (5.4 cm x 8.6 cm) */
+    .id-card {
+      width: 210px;
+      height: 330px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      page-break-inside: avoid;
+      break-inside: avoid;
+      margin: 0 auto;
+    }
+    .card-header {
+      background: var(--brand-color, #2563eb);
+      color: #ffffff;
+      padding: 14px 10px;
+    }
+    .card-org { font-size: 13px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+    .card-sub { font-size: 10px; opacity: 0.9; margin-top: 2px; }
+    
+    .qr-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+      background: #ffffff;
+    }
+    .qr-wrapper img, .qr-wrapper canvas {
+      border: 6px solid #f8fafc;
+      border-radius: 8px;
+    }
+
+    .card-body { padding: 0 12px 14px 12px; }
+    .emp-name { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0; word-wrap: break-word; }
+    .emp-role { font-size: 11px; color: #64748b; margin: 0 0 8px 0; font-weight: 600; }
+    .emp-id-badge {
+      display: inline-block;
+      background: #f1f5f9;
+      color: #334155;
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    .card-footer {
+      background: #f8fafc;
+      font-size: 9px;
+      color: #64748b;
+      padding: 6px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    /* Aturan Khusus Saat Dicetak / Save as PDF */
+    @media print {
+      body { background: #ffffff; }
+      .admin-panel { display: none !important; }
+      .cards-container {
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr); /* 3 kartu per baris di kertas A4 */
+        gap: 12px;
+      }
+      .id-card {
+        box-shadow: none;
+        border: 1px dashed #94a3b8; /* Garis panduan potong gunting */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="admin-panel">
+  <h2>🪪 Generator Kartu ID & QR Code Absensi</h2>
+  <p>Buat kartu ID massal secara instan. Data QR Code otomatis terbaca oleh pemindai Barcode pada aplikasi absensi.</p>
+
+  <div class="config-grid">
+    <div>
+      <label>Nama Instansi / Perusahaan / Sekolah</label>
+      <input type="text" id="org-name" value="Created By: Mr. Day'M" placeholder="Nama Instansi">
+    </div>
+    <div>
+      <label>Sub-Judul Kartu</label>
+      <input type="text" id="org-sub" value="KARTU ABSENSI DIGITAL" placeholder="Keterangan Kartu">
+    </div>
+    <div>
+      <label>Warna Tema Kartu</label>
+      <input type="color" id="brand-color" value="#2563eb">
+    </div>
+  </div>
+
+  <div>
+    <label>Daftar Data Pengguna (Format: <code>ID, Nama Lengkap, Jabatan/Kelas</code> — satu baris per orang)</label>
+    <textarea id="bulk-data" placeholder="Contoh:
+GR2025001, Nurosid M.Pd., Kepala Sekolah
+GR2025002, Fimman Isfandiari M.Pd., Waka Kurikulum
+GR2025007, Moh. Daimudin Ulin Nuha S.Pd. Gr., Operator Sekolah"></textarea>
+    <p style="margin-top:6px; font-size:12px;">💡 <strong>Tips Cepat:</strong> Anda bisa langsung menyalin (Copy-Paste) 3 kolom dari <strong>Excel</strong> atau <strong>Google Sheets</strong> ke kotak di atas.</p>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" onclick="generateCards()">⚡ Buat Kartu ID (<span id="total-count">0</span>)</button>
+    <button class="btn btn-print" onclick="window.print()">🖨️ Cetak / Simpan PDF</button>
+    <button class="btn btn-sample" onclick="isiContohData()">📋 Isi Contoh Data</button>
+  </div>
+</div>
+
+<!-- Tempat Render Kartu ID -->
+<div id="cards-container" class="cards-container"></div>
+
+<script>
+  // Isi data contoh bawaan
+  function isiContohData() {
+    document.getElementById("bulk-data").value = 
+`GR2025001, Nurosid M.Pd., Kepala Sekolah
+GR2025002, Fimman Isfandiari M.Pd., Waka Kurikulum
+GR2025003, Yeni Yuhaeni S.Pd.I. Gr., Waka Kesiswaan
+GR2025004, Waryanto S.Pd., Guru BK
+GR2025005, Aris Sutiryo, Staff TU
+GR2025006, Muhammad Saeful Mubaroq, Staff TU
+GR2025007, Moh. Daimudin Ulin Nuha S.Pd. Gr., Operator Sekolah`;
+    generateCards();
+  }
+
+  function generateCards() {
+    const rawText = document.getElementById("bulk-data").value.trim();
+    const orgName = document.getElementById("org-name").value.trim() || "INSTANSI";
+    const orgSub = document.getElementById("org-sub").value.trim() || "ID CARD";
+    const brandColor = document.getElementById("brand-color").value;
+    const container = document.getElementById("cards-container");
+
+    container.innerHTML = "";
+    document.documentElement.style.setProperty('--brand-color', brandColor);
+
+    if (!rawText) {
+      document.getElementById("total-count").textContent = "0";
+      return alert("Harap masukkan minimal satu baris data pengguna!");
+    }
+
+    const lines = rawText.split("\n").filter(line => line.trim() !== "");
+    document.getElementById("total-count").textContent = lines.length;
+
+    lines.forEach((line, index) => {
+      // Mendukung pemisah koma (CSV) maupun Tab (hasil Copy-Paste langsung dari Excel/Google Sheets)
+      const parts = line.includes("\t") ? line.split("\t") : line.split(",");
+      
+      const idUser = (parts[0] || `ID-${index + 1}`).trim();
+      const namaUser = (parts[1] || "Tanpa Nama").trim();
+      const jabatanUser = (parts[2] || "Anggota").trim();
+
+      const cardEl = document.createElement("div");
+      cardEl.className = "id-card";
+      const qrDivId = `qr-code-${index}`;
+
+      cardEl.innerHTML = `
+        <div class="card-header">
+          <div class="card-org">${escapeHtml(orgName)}</div>
+          <div class="card-sub">${escapeHtml(orgSub)}</div>
+        </div>
+        <div class="qr-wrapper" id="${qrDivId}"></div>
+        <div class="card-body">
+          <p class="emp-name">${escapeHtml(namaUser)}</p>
+          <p class="emp-role">${escapeHtml(jabatanUser)}</p>
+          <span class="emp-id-badge">${escapeHtml(idUser)}</span>
+        </div>
+        <div class="card-footer">Scan QR ini pada aplikasi absensi</div>
+      `;
+
+      container.appendChild(cardEl);
+
+      // Generate QR Code berisi ID User (terhubung langsung dengan logika scan di index.html)
+      new QRCode(document.getElementById(qrDivId), {
+        text: `${idUser}|${namaUser}`,
+        width: 125,
+        height: 125,
+        colorDark: "#0f172a",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  window.onload = isiContohData;
+</script>
+
+</body>
+</html>
